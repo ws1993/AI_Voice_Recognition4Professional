@@ -24,7 +24,7 @@ export async function GET(_: Request, context: { params: Promise<{ noticeId: str
     items: report.items
   });
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${report.noticeId}.pdf"`

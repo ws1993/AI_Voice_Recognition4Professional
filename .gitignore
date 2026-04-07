@@ -31,3 +31,5 @@ config/runtime/*.local.json
 *.pem
 
 *npm-cache
+
+/data

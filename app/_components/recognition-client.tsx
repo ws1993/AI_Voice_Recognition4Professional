@@ -366,14 +366,17 @@ export function RecognitionClient() {
         <div className="row">
           {!isRecording ? (
             <button className="btn-primary" onClick={() => void startRecording()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
               开始录音
             </button>
           ) : (
             <button className="btn-danger" onClick={stopRecording}>
+              <span className="recording-blob" />
               停止录音
             </button>
           )}
-          <label className="btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <label className="btn-secondary btn" style={{ cursor: "pointer" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
             上传多段音频
             <input
               type="file"
@@ -400,8 +403,8 @@ export function RecognitionClient() {
             <div className="segment-item" key={segment.key}>
               <div className="segment-head">
                 <strong>第 {segment.segmentIndex + 1} 段</strong>
-                <span className="status-chip">
-                  {segment.status === "recognizing" && "识别中"}
+                <span className={`status-chip ${segment.status}`}>
+                  {segment.status === "recognizing" && "识别中..."}
                   {segment.status === "done" && "已完成"}
                   {segment.status === "error" && "失败"}
                 </span>
@@ -432,21 +435,22 @@ export function RecognitionClient() {
       <section className="panel">
         <h3 style={{ marginTop: 0 }}>通知单信息</h3>
         <div className="row">
-          <div style={{ flex: 1, minWidth: 200 }}>
+          <div className="input-group">
             <label>企业名称</label>
             <input value={enterpriseName} onChange={(e) => setEnterpriseName(e.target.value)} />
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
+          <div className="input-group">
             <label>检查人（可选）</label>
             <input value={inspector} onChange={(e) => setInspector(e.target.value)} />
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
+          <div className="input-group">
             <label>检查日期（可选）</label>
             <input value={inspectedAt} onChange={(e) => setInspectedAt(e.target.value)} placeholder="2026-04-03" />
           </div>
         </div>
         <div style={{ marginTop: 10 }}>
           <button className="btn-primary" disabled={busy} onClick={() => void submitReport()}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
             {busy ? "生成中..." : "提交并生成通知单"}
           </button>
         </div>
@@ -467,10 +471,12 @@ export function RecognitionClient() {
             </div>
           ))}
           <div className="row">
-            <a className="btn-primary" href={notice.pdfUrl} target="_blank" rel="noreferrer">
+            <a className="btn-primary btn" href={notice.pdfUrl} target="_blank" rel="noreferrer">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
               下载 PDF
             </a>
-            <a className="btn-secondary" href={`/report/${notice.noticeId}`}>
+            <a className="btn-secondary btn" href={`/report/${notice.noticeId}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
               查看详情页
             </a>
           </div>
@@ -480,13 +486,16 @@ export function RecognitionClient() {
       <section className="panel">
         <h3 style={{ marginTop: 0 }}>后台入口</h3>
         <div className="row">
-          <a className="btn-secondary" href="/admin/settings">
+          <a className="btn-secondary btn" href="/admin/settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             配置管理
           </a>
-          <a className="btn-secondary" href="/admin/terms">
+          <a className="btn-secondary btn" href="/admin/terms">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
             术语库管理
           </a>
-          <a className="btn-secondary" href="/admin/clauses">
+          <a className="btn-secondary btn" href="/admin/clauses">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
             标准条目库管理
           </a>
         </div>

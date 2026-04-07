@@ -12,7 +12,8 @@ export default async function NoticeReportPage({ params }: { params: Promise<{ n
         <section className="panel">
           <h3 style={{ marginTop: 0 }}>通知单不存在</h3>
           <p className="meta">编号：{noticeId}</p>
-          <a className="btn-secondary" href="/">
+          <a className="btn-secondary btn" href="/">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             返回首页
           </a>
         </section>
@@ -41,10 +42,12 @@ export default async function NoticeReportPage({ params }: { params: Promise<{ n
           </div>
         ))}
         <div className="row">
-          <a className="btn-primary" href={report.pdfUrl} target="_blank" rel="noreferrer">
+          <a className="btn-primary btn" href={report.pdfUrl} target="_blank" rel="noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             下载 PDF
           </a>
-          <a className="btn-secondary" href="/">
+          <a className="btn-secondary btn" href="/">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             返回首页
           </a>
         </div>

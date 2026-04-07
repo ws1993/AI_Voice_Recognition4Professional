@@ -112,6 +112,7 @@ export default function AdminClausesPage() {
   // 从文件导入到 IndexedDB
   async function importClausesToIndexedDB(file: File | null) {
     if (!file) {
+      setMessage("请先选择文件");
       return;
     }
 
@@ -124,34 +125,79 @@ export default function AdminClausesPage() {
       let importedClauses: Clause[] = [];
 
       if (file.name.endsWith(".json")) {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          importedClauses = parsed as Clause[];
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            importedClauses = parsed.map((item, idx) => ({
+              id: item.id || `clause_${Date.now()}_${idx}`,
+              clauseCode: item.clauseCode || item.code || item.code || "",
+              title: item.title || item.name || "",
+              content: item.content || item.description || "",
+              category: item.category || "通用",
+              keywords: item.keywords || []
+            })).filter(item => item.clauseCode || item.title);
+          }
+        } catch {
+          throw new Error("JSON 解析失败");
         }
       } else {
-        // CSV 解析（简单实现，假设第一行是表头）
+        // CSV 解析 - 简单健壮的实现
         const lines = text.split(/\r?\n/).filter((line) => line.trim());
-        if (lines.length > 1) {
-          // 假设表头：clauseCode,title,content,category,keywords
-          for (let i = 1; i < lines.length; i++) {
-            const match = lines[i].match(/("([^"]*)"|([^",]*))(,|$)/g);
-            if (match && match.length >= 4) {
-              const extract = (val: string) => val.replace(/^"|"$/g, "").trim();
-              importedClauses.push({
-                id: `clause_${Date.now()}_${i}`,
-                clauseCode: extract(match[0]?.replace(/,$/, "") || ""),
-                title: extract(match[1]?.replace(/,$/, "") || ""),
-                content: extract(match[2]?.replace(/,$/, "") || ""),
-                category: extract(match[3]?.replace(/,$/, "") || "通用"),
-                keywords: []
-              });
-            }
+        if (lines.length < 2) {
+          setMessage("CSV 文件内容不足");
+          setBusy(false);
+          return;
+        }
+
+        // 解析表头
+        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+
+        // 找到字段索引
+        const getFieldIdx = (names: string[]) => {
+          for (const name of names) {
+            const idx = headers.findIndex(h => h.includes(name));
+            if (idx !== -1) return idx;
           }
+          return -1;
+        };
+
+        const codeIdx = getFieldIdx(["code", "clausecode", "cod"]);
+        const titleIdx = getFieldIdx(["title", "name", "标题"]);
+        const contentIdx = getFieldIdx(["content", "description", "description", "内容", "desc"]);
+        const categoryIdx = getFieldIdx(["category", "cat", "分类"]);
+        const keywordsIdx = getFieldIdx(["keywords", "keyword", "tags", "标签"]);
+
+        // 解析数据行
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i]);
+          if (values.length === 0 || values.every(v => !v.trim())) continue;
+
+          const clauseCode = codeIdx !== -1 ? values[codeIdx] : values[0] || "";
+          const title = titleIdx !== -1 ? values[titleIdx] : values[1] || "";
+          const content = contentIdx !== -1 ? values[contentIdx] : values[2] || "";
+          const category = categoryIdx !== -1 ? values[categoryIdx] : "通用";
+          const keywordsStr = keywordsIdx !== -1 ? values[keywordsIdx] : "";
+
+          if (!clauseCode && !title) continue;
+
+          const keywords = keywordsStr
+            ? keywordsStr.split(/[,;|]/).map(k => k.trim()).filter(Boolean)
+            : [];
+
+          importedClauses.push({
+            id: `clause_${Date.now()}_${i}`,
+            clauseCode: clauseCode.trim(),
+            title: title.trim(),
+            content: content.trim(),
+            category: category.trim() || "通用",
+            keywords
+          });
         }
       }
 
       if (importedClauses.length === 0) {
-        setMessage("未找到可导入的数据");
+        setMessage("未找到可导入的数据，请检查文件格式");
+        setBusy(false);
         return;
       }
 
@@ -160,10 +206,44 @@ export default function AdminClausesPage() {
       setMessage(`导入成功：${importedClauses.length} 条（IndexedDB）`);
     } catch (error) {
       console.error("Import failed", error);
-      setMessage("导入失败，请检查文件格式");
+      setMessage(`导入失败：${error instanceof Error ? error.message : "请检查文件格式"}`);
     } finally {
       setBusy(false);
     }
+  }
+
+  // 解析 CSV 单行（处理引号）
+  function parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          current += '"';
+          i++; // 跳过下一个引号
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          current += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ",") {
+          result.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+    }
+    result.push(current.trim());
+    return result;
   }
 
   async function importClauses(file: File | null) {
@@ -297,10 +377,10 @@ export default function AdminClausesPage() {
         </button>
       </div>
 
-      <label style={{ marginTop: 10, display: "block" }}>导入 CSV/XLSX/JSON</label>
+      <label style={{ marginTop: 10, display: "block" }}>导入 CSV/JSON（暂不支持 XLSX）</label>
       <input
         type="file"
-        accept=".csv,.xlsx,.xls,.json"
+        accept=".csv,.json"
         disabled={busy}
         onChange={(event) => {
           const file = event.target.files?.[0] ?? null;

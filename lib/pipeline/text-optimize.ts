@@ -4,15 +4,29 @@ import type { AppSettings } from "@/types/contracts";
 export const MIN_OPTIMIZE_TEXT_LENGTH = 20;
 export const OPTIMIZE_TIMEOUT_MS = 5000;
 
-export async function optimizeText(inputText: string, settings: AppSettings): Promise<string> {
+export type TextOptimizeResult = {
+  text: string;
+  optimizeSkipped: boolean;
+  optimizeTimedOut: boolean;
+};
+
+export async function optimizeText(inputText: string, settings: AppSettings): Promise<TextOptimizeResult> {
   const normalizedText = inputText.trim();
   if (normalizedText.length < MIN_OPTIMIZE_TEXT_LENGTH) {
-    return inputText;
+    return {
+      text: inputText,
+      optimizeSkipped: true,
+      optimizeTimedOut: false
+    };
   }
 
   const provider = settings.providers.find((item) => item.kind === "llm" && item.enabled);
   if (!provider) {
-    return inputText;
+    return {
+      text: inputText,
+      optimizeSkipped: true,
+      optimizeTimedOut: false
+    };
   }
 
   const controller = new AbortController();
@@ -35,16 +49,29 @@ export async function optimizeText(inputText: string, settings: AppSettings): Pr
       }
     );
     if (result && result.trim().length > 0) {
-      return result.trim();
+      return {
+        text: result.trim(),
+        optimizeSkipped: false,
+        optimizeTimedOut: false
+      };
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       console.warn(`Text optimization timed out after ${OPTIMIZE_TIMEOUT_MS}ms`);
+      return {
+        text: inputText,
+        optimizeSkipped: false,
+        optimizeTimedOut: true
+      };
     } else {
       console.error("Text optimization failed:", error);
     }
   } finally {
     clearTimeout(timeoutId);
   }
-  return inputText;
+  return {
+    text: inputText,
+    optimizeSkipped: false,
+    optimizeTimedOut: false
+  };
 }

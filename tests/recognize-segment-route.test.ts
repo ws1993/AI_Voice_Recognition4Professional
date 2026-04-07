@@ -71,7 +71,11 @@ describe("POST /api/recognize/segment", () => {
     });
     mockedReadTerms.mockResolvedValue([]);
     mockedCorrectByGlossary.mockResolvedValue("");
-    mockedOptimizeText.mockResolvedValue("");
+    mockedOptimizeText.mockResolvedValue({
+      text: "",
+      optimizeSkipped: false,
+      optimizeTimedOut: false
+    });
     mockedSaveSegmentRecord.mockImplementation(async (input) => ({
       segmentId: "seg-1",
       sessionId: input.sessionId,
@@ -87,7 +91,11 @@ describe("POST /api/recognize/segment", () => {
   it("returns segmented timing fields on success", async () => {
     mockedTranscribeAudio.mockResolvedValueOnce("原始文本");
     mockedCorrectByGlossary.mockResolvedValueOnce("术语文本");
-    mockedOptimizeText.mockResolvedValueOnce("优化文本");
+    mockedOptimizeText.mockResolvedValueOnce({
+      text: "优化文本",
+      optimizeSkipped: false,
+      optimizeTimedOut: false
+    });
 
     const nowSpy = vi
       .spyOn(Date, "now")
@@ -108,6 +116,8 @@ describe("POST /api/recognize/segment", () => {
       asrMs: number;
       glossaryMs: number;
       optimizeMs: number;
+      optimizeSkipped: boolean;
+      optimizeTimedOut: boolean;
       timing: number;
     };
 
@@ -119,6 +129,8 @@ describe("POST /api/recognize/segment", () => {
       asrMs: 30,
       glossaryMs: 30,
       optimizeMs: 30,
+      optimizeSkipped: false,
+      optimizeTimedOut: false,
       timing: 140
     });
 

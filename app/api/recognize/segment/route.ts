@@ -46,8 +46,9 @@ export async function POST(request: NextRequest) {
     const glossaryMs = Date.now() - glossaryStarted;
 
     const optimizeStarted = Date.now();
-    const polishedText = await optimizeText(correctedText, settings);
+    const optimizeResult = await optimizeText(correctedText, settings);
     const optimizeMs = Date.now() - optimizeStarted;
+    const polishedText = optimizeResult.text;
 
     const totalMs = Date.now() - started;
 
@@ -70,6 +71,8 @@ export async function POST(request: NextRequest) {
       asrMs,
       glossaryMs,
       optimizeMs,
+      optimizeSkipped: optimizeResult.optimizeSkipped,
+      optimizeTimedOut: optimizeResult.optimizeTimedOut,
       timing: record.timingMs
     });
   } catch (error) {

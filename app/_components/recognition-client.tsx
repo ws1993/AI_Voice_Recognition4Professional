@@ -17,6 +17,8 @@ type SegmentUI = {
   glossaryMs?: number;
   optimizeMs?: number;
   totalMs?: number;
+  optimizeSkipped?: boolean;
+  optimizeTimedOut?: boolean;
   editedText: string;
   error?: string;
 };
@@ -146,6 +148,8 @@ export function RecognitionClient() {
           asrMs: number;
           glossaryMs: number;
           optimizeMs: number;
+          optimizeSkipped: boolean;
+          optimizeTimedOut: boolean;
           timing: number;
         };
 
@@ -162,6 +166,8 @@ export function RecognitionClient() {
                   glossaryMs: data.glossaryMs,
                   optimizeMs: data.optimizeMs,
                   totalMs: data.timing,
+                  optimizeSkipped: data.optimizeSkipped,
+                  optimizeTimedOut: data.optimizeTimedOut,
                   editedText: data.polishedText
                 }
               : item
@@ -411,6 +417,8 @@ export function RecognitionClient() {
                   {segment.optimizeMs ?? 0} ms
                 </p>
               ) : null}
+              {segment.optimizeTimedOut ? <p className="meta">优化状态：超时回退原文</p> : null}
+              {segment.optimizeSkipped && !segment.optimizeTimedOut ? <p className="meta">优化状态：已跳过</p> : null}
               {segment.error ? <p className="meta" style={{ color: "#c0392b" }}>{segment.error}</p> : null}
               <textarea
                 value={segment.editedText}

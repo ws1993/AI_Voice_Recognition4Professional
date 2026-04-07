@@ -51,7 +51,11 @@ describe("optimizeText", () => {
   it("skips optimization for short text", async () => {
     const shortText = "安".repeat(MIN_OPTIMIZE_TEXT_LENGTH - 1);
 
-    await expect(optimizeText(shortText, makeSettings())).resolves.toBe(shortText);
+    await expect(optimizeText(shortText, makeSettings())).resolves.toMatchObject({
+      text: shortText,
+      optimizeSkipped: true,
+      optimizeTimedOut: false
+    });
     expect(mockedOpenAiLikeChat).not.toHaveBeenCalled();
   });
 
@@ -59,7 +63,11 @@ describe("optimizeText", () => {
     mockedOpenAiLikeChat.mockResolvedValueOnce("优化后的文本");
     const input = "这是一个足够长的安全检查文本，用于触发优化逻辑。";
 
-    await expect(optimizeText(input, makeSettings())).resolves.toBe("优化后的文本");
+    await expect(optimizeText(input, makeSettings())).resolves.toMatchObject({
+      text: "优化后的文本",
+      optimizeSkipped: false,
+      optimizeTimedOut: false
+    });
   });
 
   it("falls back to original text when optimization times out", async () => {
@@ -81,7 +89,11 @@ describe("optimizeText", () => {
     const promise = optimizeText(input, makeSettings());
     await vi.advanceTimersByTimeAsync(OPTIMIZE_TIMEOUT_MS);
 
-    await expect(promise).resolves.toBe(input);
+    await expect(promise).resolves.toMatchObject({
+      text: input,
+      optimizeSkipped: false,
+      optimizeTimedOut: true
+    });
     expect(warnSpy).toHaveBeenCalledWith(`Text optimization timed out after ${OPTIMIZE_TIMEOUT_MS}ms`);
   });
 });

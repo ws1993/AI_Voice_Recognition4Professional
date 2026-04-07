@@ -62,6 +62,28 @@ function inferAudioFormat(file: File): string {
   return "webm";
 }
 
+function inferAudioMimeType(file: File): string {
+  const mimeType = file.type.toLowerCase().split(";")[0];
+  if (mimeType) {
+    return mimeType;
+  }
+
+  switch (inferAudioFormat(file)) {
+    case "mp3":
+      return "audio/mpeg";
+    case "wav":
+      return "audio/wav";
+    case "m4a":
+      return "audio/mp4";
+    case "ogg":
+    case "opus":
+      return "audio/ogg";
+    case "webm":
+    default:
+      return "audio/webm";
+  }
+}
+
 function normalizeAsrLanguage(language: string): string | undefined {
   const normalized = language.trim().toLowerCase();
   if (!normalized) {
@@ -76,6 +98,11 @@ function normalizeAsrLanguage(language: string): string | undefined {
 async function fileToBase64(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
   return buffer.toString("base64");
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+  const base64 = await fileToBase64(file);
+  return `data:${inferAudioMimeType(file)};base64,${base64}`;
 }
 
 function extractChatContent(data: ChatCompletionResponse): string | null {
@@ -130,7 +157,7 @@ async function chatAudioTranscribe(profile: ProviderProfile, file: File, languag
   }
 
   const normalizedLanguage = normalizeAsrLanguage(language);
-  const audioBase64 = await fileToBase64(file);
+  const audioDataUrl = await fileToDataUrl(file);
   const payload: Record<string, unknown> = {
     model: profile.model,
     messages: [
@@ -138,14 +165,9 @@ async function chatAudioTranscribe(profile: ProviderProfile, file: File, languag
         role: "user",
         content: [
           {
-            type: "text",
-            text: `Transcribe this audio accurately in ${language}. Return only the transcript text without explanation.`
-          },
-          {
             type: "input_audio",
             input_audio: {
-              data: audioBase64,
-              format: inferAudioFormat(file)
+              data: audioDataUrl
             }
           }
         ]

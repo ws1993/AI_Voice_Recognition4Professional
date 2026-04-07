@@ -23,12 +23,35 @@ type NoticeState = {
   pdfUrl: string;
 } | null;
 
-const SILENCE_MS = 900;
-const MAX_SEGMENT_MS = 90_000;
-const MIN_SEGMENT_MS = 1_500;
+const MIN_RECORDING_BYTES = 1024;
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "识别失败，请重试";
+}
+
+async function getResponseErrorMessage(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return `识别失败（${response.status}）`;
+  }
+
+  try {
+    const data = JSON.parse(text) as { error?: string };
+    if (typeof data.error === "string" && data.error.trim()) {
+      return data.error.trim();
+    }
+  } catch {
+    return text;
+  }
+
+  return text;
 }
 
 export function RecognitionClient() {
@@ -45,11 +68,7 @@ export function RecognitionClient() {
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const monitorTimerRef = useRef<number | null>(null);
-  const segmentStartRef = useRef<number>(0);
-  const lastVoiceRef = useRef<number>(0);
+  const chunksRef = useRef<Blob[]>([]);
   const nextSegmentIndexRef = useRef<number>(0);
   const sourceRef = useRef<"realtime" | "upload">("realtime");
 
@@ -113,8 +132,7 @@ export function RecognitionClient() {
         });
 
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text || "识别失败");
+          throw new Error(await getResponseErrorMessage(response));
         }
 
         const data = (await response.json()) as {
@@ -140,33 +158,29 @@ export function RecognitionClient() {
         setMessage(`第 ${currentIndex + 1} 段识别完成`);
       } catch (error) {
         console.error(error);
+        const errorMessage = getErrorMessage(error);
         setSegments((prev) =>
           prev.map((item) =>
             item.key === key
               ? {
                   ...item,
                   status: "error",
-                  error: "识别失败，请重试"
+                  error: errorMessage
                 }
               : item
           )
         );
-        setMessage(`第 ${currentIndex + 1} 段识别失败`);
+        setMessage(`识别失败：${errorMessage}`);
       }
     },
     [createSession]
   );
 
-  const stopMonitor = useCallback(() => {
-    if (monitorTimerRef.current) {
-      window.clearInterval(monitorTimerRef.current);
-      monitorTimerRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    analyserRef.current = null;
+  const releaseRecordingResources = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+    setIsRecording(false);
   }, []);
 
   const stopRecording = useCallback(() => {
@@ -176,7 +190,8 @@ export function RecognitionClient() {
     }
 
     try {
-      if (recorder.state === "recording") {
+      if (recorder.state !== "inactive") {
+        setMessage("录音结束，正在识别...");
         recorder.requestData();
         recorder.stop();
       }
@@ -184,13 +199,8 @@ export function RecognitionClient() {
       console.error("stop recording failed", error);
     }
 
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    recorderRef.current = null;
-    stopMonitor();
-    setIsRecording(false);
-    setMessage("录音已停止");
-  }, [stopMonitor]);
+    releaseRecordingResources();
+  }, [releaseRecordingResources]);
 
   const startRecording = useCallback(async () => {
     if (isRecording) {
@@ -212,74 +222,46 @@ export function RecognitionClient() {
         ? "audio/webm;codecs=opus"
         : undefined;
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      chunksRef.current = [];
 
-      recorder.ondataavailable = async (event) => {
-        if (!event.data || event.data.size < 1024) {
+      recorder.ondataavailable = (event) => {
+        if (!event.data || event.data.size === 0) {
           return;
         }
-        await uploadSegment(event.data);
-        segmentStartRef.current = Date.now();
-        lastVoiceRef.current = Date.now();
+        chunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const audioChunks = [...chunksRef.current];
+        chunksRef.current = [];
+
+        const blob = new Blob(audioChunks, { type: recorder.mimeType || mimeType || "audio/webm" });
+        if (blob.size < MIN_RECORDING_BYTES) {
+          setMessage("录音内容过短，请重试");
+          return;
+        }
+
+        void uploadSegment(blob, `segment-${nextSegmentIndexRef.current}.webm`);
       };
 
       recorder.onerror = (event) => {
         console.error("MediaRecorder error", event);
+        chunksRef.current = [];
         setMessage("录音异常，请重新开始");
-        stopRecording();
+        releaseRecordingResources();
       };
 
       recorder.start();
       recorderRef.current = recorder;
       setIsRecording(true);
-      setMessage("录音中：自动静音分段识别");
-
-      const context = new AudioContext();
-      audioContextRef.current = context;
-      const source = context.createMediaStreamSource(stream);
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      segmentStartRef.current = Date.now();
-      lastVoiceRef.current = Date.now();
-
-      const data = new Uint8Array(analyser.fftSize);
-      monitorTimerRef.current = window.setInterval(() => {
-        const a = analyserRef.current;
-        const r = recorderRef.current;
-        if (!a || !r || r.state !== "recording") {
-          return;
-        }
-
-        a.getByteTimeDomainData(data);
-        let sum = 0;
-        for (const v of data) {
-          const delta = (v - 128) / 128;
-          sum += delta * delta;
-        }
-        const rms = Math.sqrt(sum / data.length);
-
-        const now = Date.now();
-        if (rms > 0.02) {
-          lastVoiceRef.current = now;
-        }
-
-        const segmentAge = now - segmentStartRef.current;
-        const silenceAge = now - lastVoiceRef.current;
-
-        if (segmentAge > MIN_SEGMENT_MS && silenceAge > SILENCE_MS) {
-          r.requestData();
-        } else if (segmentAge > MAX_SEGMENT_MS) {
-          r.requestData();
-        }
-      }, 240);
+      setMessage("录音中，点击停止后识别");
     } catch (error) {
       console.error(error);
       setMessage("无法开始录音，请检查麦克风权限");
-      stopRecording();
+      chunksRef.current = [];
+      releaseRecordingResources();
     }
-  }, [createSession, isRecording, stopRecording, uploadSegment]);
+  }, [createSession, isRecording, releaseRecordingResources, uploadSegment]);
 
   const onUploadFiles = useCallback(
     async (files: FileList | null) => {
@@ -358,7 +340,7 @@ export function RecognitionClient() {
     <div className="container">
       <section className="hero">
         <h1>安监语音识别整改系统</h1>
-        <p>移动端实时分段识别，自动生成《企业安全检查整改通知单》PDF</p>
+        <p>移动端实时录音识别，停止后整段生成《企业安全检查整改通知单》PDF</p>
         {isRecording ? <div className="wave" /> : null}
       </section>
 
@@ -391,11 +373,11 @@ export function RecognitionClient() {
       </section>
 
       <section className="panel">
-        <h3 style={{ marginTop: 0 }}>分段识别结果</h3>
+        <h3 style={{ marginTop: 0 }}>识别结果</h3>
         <p className="meta">
           已完成 {doneCount} 段 / 共 {segments.length} 段
         </p>
-        {segments.length === 0 ? <p className="meta">暂无分段结果</p> : null}
+        {segments.length === 0 ? <p className="meta">暂无识别结果</p> : null}
         {segments
           .slice()
           .sort((a, b) => a.segmentIndex - b.segmentIndex)

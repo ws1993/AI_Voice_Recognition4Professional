@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
+import { ZodError } from "zod";
 
-import { transcribeAudio } from "@/lib/pipeline/asr";
+import { AsrConfigError, AsrProviderError, transcribeAudio } from "@/lib/pipeline/asr";
 import { optimizeText } from "@/lib/pipeline/text-optimize";
 import { correctByGlossary } from "@/lib/pipeline/terms";
 import { ensureSessionExists, readSettings, readTerms, saveSegmentRecord } from "@/lib/store/repository";
@@ -59,6 +60,18 @@ export async function POST(request: NextRequest) {
       timing: record.timingMs
     });
   } catch (error) {
-    return fail("Failed to recognize segment", 400, error);
+    if (error instanceof AsrConfigError) {
+      return fail(error.message, 503);
+    }
+
+    if (error instanceof AsrProviderError) {
+      return fail(error.message, 502);
+    }
+
+    if (error instanceof ZodError) {
+      return fail("Invalid segment request", 400, error);
+    }
+
+    return fail("Failed to recognize segment", 500, error);
   }
 }

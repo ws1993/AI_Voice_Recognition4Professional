@@ -26,6 +26,8 @@ vi.mock("@/lib/pipeline/asr", async () => {
 
 import { POST } from "@/app/api/recognize/segment/route";
 import { AsrConfigError, AsrProviderError, transcribeAudio } from "@/lib/pipeline/asr";
+import { optimizeText } from "@/lib/pipeline/text-optimize";
+import { correctByGlossary } from "@/lib/pipeline/terms";
 import { ensureSessionExists, readSettings, readTerms, saveSegmentRecord } from "@/lib/store/repository";
 
 const mockedTranscribeAudio = vi.mocked(transcribeAudio);
@@ -33,6 +35,8 @@ const mockedEnsureSessionExists = vi.mocked(ensureSessionExists);
 const mockedReadSettings = vi.mocked(readSettings);
 const mockedReadTerms = vi.mocked(readTerms);
 const mockedSaveSegmentRecord = vi.mocked(saveSegmentRecord);
+const mockedCorrectByGlossary = vi.mocked(correctByGlossary);
+const mockedOptimizeText = vi.mocked(optimizeText);
 
 function makeRequest() {
   const form = new FormData();
@@ -66,16 +70,59 @@ describe("POST /api/recognize/segment", () => {
       }
     });
     mockedReadTerms.mockResolvedValue([]);
-    mockedSaveSegmentRecord.mockResolvedValue({
+    mockedCorrectByGlossary.mockResolvedValue("");
+    mockedOptimizeText.mockResolvedValue("");
+    mockedSaveSegmentRecord.mockImplementation(async (input) => ({
       segmentId: "seg-1",
-      sessionId: "sess-1",
-      segmentIndex: 0,
-      rawText: "",
-      correctedText: "",
-      polishedText: "",
-      timingMs: 0,
+      sessionId: input.sessionId,
+      segmentIndex: input.segmentIndex,
+      rawText: input.rawText,
+      correctedText: input.correctedText,
+      polishedText: input.polishedText,
+      timingMs: input.timingMs,
       createdAt: new Date().toISOString()
+    }));
+  });
+
+  it("returns segmented timing fields on success", async () => {
+    mockedTranscribeAudio.mockResolvedValueOnce("原始文本");
+    mockedCorrectByGlossary.mockResolvedValueOnce("术语文本");
+    mockedOptimizeText.mockResolvedValueOnce("优化文本");
+
+    const nowSpy = vi
+      .spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(40)
+      .mockReturnValueOnce(50)
+      .mockReturnValueOnce(80)
+      .mockReturnValueOnce(90)
+      .mockReturnValueOnce(120)
+      .mockReturnValueOnce(140);
+
+    const response = await POST(makeRequest());
+    const data = (await response.json()) as {
+      rawText: string;
+      correctedText: string;
+      polishedText: string;
+      asrMs: number;
+      glossaryMs: number;
+      optimizeMs: number;
+      timing: number;
+    };
+
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      rawText: "原始文本",
+      correctedText: "术语文本",
+      polishedText: "优化文本",
+      asrMs: 30,
+      glossaryMs: 30,
+      optimizeMs: 30,
+      timing: 140
     });
+
+    nowSpy.mockRestore();
   });
 
   it("returns 503 when ASR config is invalid", async () => {

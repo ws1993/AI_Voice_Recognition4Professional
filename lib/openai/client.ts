@@ -5,6 +5,11 @@ type ChatMessage = {
   content: string;
 };
 
+type ChatRequestOptions = {
+  disableThinking?: boolean;
+  signal?: AbortSignal;
+};
+
 type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
@@ -219,7 +224,8 @@ export async function openAiLikeTranscribe(
 export async function openAiLikeChat(
   profile: ProviderProfile,
   messages: ChatMessage[],
-  jsonOutput = false
+  jsonOutput = false,
+  options: ChatRequestOptions = {}
 ): Promise<string | null> {
   const apiKey = getApiKey(profile);
   if (!apiKey || !profile.enabled) {
@@ -233,6 +239,11 @@ export async function openAiLikeChat(
   if (jsonOutput) {
     payload.response_format = { type: "json_object" };
   }
+  if (options.disableThinking) {
+    payload.extra_body = {
+      enable_thinking: false
+    };
+  }
 
   const response = await fetch(withPath(profile.baseUrl, "/chat/completions"), {
     method: "POST",
@@ -240,6 +251,7 @@ export async function openAiLikeChat(
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`
     },
+    signal: options.signal,
     body: JSON.stringify(payload)
   });
   if (!response.ok) {

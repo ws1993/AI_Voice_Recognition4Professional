@@ -37,9 +37,19 @@ export async function POST(request: NextRequest) {
     const settings = await readSettings();
     const terms = await readTerms();
 
+    const asrStarted = Date.now();
     const rawText = await transcribeAudio(audioFile, parsed.language, settings);
+    const asrMs = Date.now() - asrStarted;
+
+    const glossaryStarted = Date.now();
     const correctedText = await correctByGlossary(rawText, terms, settings);
+    const glossaryMs = Date.now() - glossaryStarted;
+
+    const optimizeStarted = Date.now();
     const polishedText = await optimizeText(correctedText, settings);
+    const optimizeMs = Date.now() - optimizeStarted;
+
+    const totalMs = Date.now() - started;
 
     const record = await saveSegmentRecord({
       sessionId: parsed.sessionId,
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
       rawText,
       correctedText,
       polishedText,
-      timingMs: Date.now() - started
+      timingMs: totalMs
     });
 
     return ok({
@@ -57,6 +67,9 @@ export async function POST(request: NextRequest) {
       rawText: record.rawText,
       correctedText: record.correctedText,
       polishedText: record.polishedText,
+      asrMs,
+      glossaryMs,
+      optimizeMs,
       timing: record.timingMs
     });
   } catch (error) {

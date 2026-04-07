@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { openAiLikeTranscribe } from "@/lib/openai/client";
+import { openAiLikeChat, openAiLikeTranscribe } from "@/lib/openai/client";
 import type { ProviderProfile } from "@/types/contracts";
 
 const originalEnv = { ...process.env };
@@ -79,5 +79,48 @@ describe("openAiLikeTranscribe chat_audio payload", () => {
     expect(payload.messages[0].content[0].text).toBeUndefined();
     expect(payload.messages[0].content[0].input_audio?.data.startsWith("data:audio/webm;base64,")).toBe(true);
     expect(payload.asr_options?.language).toBe("zh");
+  });
+
+  it("disables thinking mode when requested for chat completions", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "优化后的文本"
+              }
+            }
+          ]
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    const result = await openAiLikeChat(
+      {
+        ...makeProfile(),
+        kind: "llm",
+        apiStyle: "chat_completions",
+        model: "qwen3.5-flash"
+      },
+      [{ role: "user", content: "请优化这句话" }],
+      false,
+      { disableThinking: true }
+    );
+
+    expect(result).toBe("优化后的文本");
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const payload = JSON.parse(String(init?.body)) as {
+      extra_body?: {
+        enable_thinking?: boolean;
+      };
+    };
+
+    expect(payload.extra_body?.enable_thinking).toBe(false);
   });
 });

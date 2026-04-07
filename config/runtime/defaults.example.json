@@ -21,7 +21,7 @@
     "llm": {
       "name": "default-llm",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "model": "qwen3.5-plus",
+      "model": "qwen3.5-flash",
       "apiKeyEnvName": "DASHSCOPE_API_KEY",
       "apiStyle": "chat_completions",
       "enabled": true

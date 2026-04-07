@@ -13,6 +13,10 @@ type SegmentUI = {
   rawText?: string;
   correctedText?: string;
   polishedText?: string;
+  asrMs?: number;
+  glossaryMs?: number;
+  optimizeMs?: number;
+  totalMs?: number;
   editedText: string;
   error?: string;
 };
@@ -139,6 +143,10 @@ export function RecognitionClient() {
           rawText: string;
           correctedText: string;
           polishedText: string;
+          asrMs: number;
+          glossaryMs: number;
+          optimizeMs: number;
+          timing: number;
         };
 
         setSegments((prev) =>
@@ -150,6 +158,10 @@ export function RecognitionClient() {
                   rawText: data.rawText,
                   correctedText: data.correctedText,
                   polishedText: data.polishedText,
+                  asrMs: data.asrMs,
+                  glossaryMs: data.glossaryMs,
+                  optimizeMs: data.optimizeMs,
+                  totalMs: data.timing,
                   editedText: data.polishedText
                 }
               : item
@@ -393,6 +405,12 @@ export function RecognitionClient() {
               </div>
               {segment.rawText ? <p className="meta">原始：{segment.rawText}</p> : null}
               {segment.correctedText ? <p className="meta">术语：{segment.correctedText}</p> : null}
+              {typeof segment.totalMs === "number" ? (
+                <p className="meta">
+                  耗时：总计 {segment.totalMs} ms | ASR {segment.asrMs ?? 0} ms | 术语 {segment.glossaryMs ?? 0} ms | 优化{" "}
+                  {segment.optimizeMs ?? 0} ms
+                </p>
+              ) : null}
               {segment.error ? <p className="meta" style={{ color: "#c0392b" }}>{segment.error}</p> : null}
               <textarea
                 value={segment.editedText}

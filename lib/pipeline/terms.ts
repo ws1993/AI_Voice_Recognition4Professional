@@ -61,7 +61,8 @@ export async function correctByGlossary(
         { role: "system", content: "你是工业安全检查文本术语纠错助手。" },
         { role: "user", content: prompt }
       ],
-      false
+      false,
+      { disableThinking: true }
     );
     if (result && result.trim().length > 0) {
       return result.trim();

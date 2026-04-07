@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 
 import type { NoticeItem } from "@/types/contracts";
 import { getClientStore, applyGlossaryToText, ClientStore } from "@/lib/store/client-repo";
+import { openAiLikeTranscribe } from "@/lib/openai/client";
 
 type SegmentStatus = "recognizing" | "done" | "error";
 
@@ -182,35 +183,57 @@ export function RecognitionClient() {
             ? blob
             : new File([blob], fileName ?? `segment-${currentIndex}.webm`, { type: blob.type || "audio/webm" });
 
+        // 在客户端直接调用 ASR API
+        const store = clientStoreRef.current ?? getClientStore();
+        const settings = await store.loadSettings();
+
+        // 查找启用的 ASR 提供商
+        const asrProvider = settings.providers.find((p) => p.kind === "asr" && p.enabled);
+        if (!asrProvider) {
+          throw new Error("未找到启用的 ASR 提供商，请在设置页面配置");
+        }
+        if (!asrProvider.apiKey || asrProvider.apiKey.trim().length === 0) {
+          throw new Error("ASR API Key 未配置，请在设置页面配置");
+        }
+
+        const asrStarted = Date.now();
+        const rawText = await openAiLikeTranscribe(asrProvider, audioFile, "zh-CN");
+        if (!rawText || rawText.trim().length === 0) {
+          throw new Error("ASR 服务返回空结果");
+        }
+        const asrMs = Date.now() - asrStarted;
+
+        // 在客户端应用术语库
+        const glossaryStarted = Date.now();
+        const terms = await store.loadTerms();
+        const correctedText = applyGlossaryToText(rawText, terms);
+        const glossaryMs = Date.now() - glossaryStarted;
+
+        // 文本优化（跳过，因为需要服务器调用）
+        const optimizeStarted = Date.now();
+        const polishedText = correctedText; // 暂时使用术语校正后的文本
+        const optimizeMs = Date.now() - optimizeStarted;
+        const optimizeSkipped = true;
+        const optimizeTimedOut = false;
+
+        // 保存到服务器
         const form = new FormData();
         form.append("sessionId", sid);
         form.append("segmentIndex", String(currentIndex));
-        form.append("language", "zh-CN");
-        form.append("audioFile", audioFile);
+        form.append("rawText", rawText);
+        form.append("correctedText", correctedText);
+        form.append("polishedText", polishedText);
+        form.append("timingMs", String(asrMs + glossaryMs + optimizeMs));
 
-        const response = await fetch("/api/recognize/segment", {
+        const saveResponse = await fetch("/api/recognize/segment/save", {
           method: "POST",
           body: form
         });
 
-        if (!response.ok) {
-          throw new Error(await getResponseErrorMessage(response));
+        let savedData: any = {};
+        if (saveResponse.ok) {
+          savedData = await saveResponse.json();
         }
-
-        const data = (await response.json()) as {
-          rawText: string;
-          correctedText: string;
-          polishedText: string;
-          asrMs: number;
-          glossaryMs: number;
-          optimizeMs: number;
-          optimizeSkipped: boolean;
-          optimizeTimedOut: boolean;
-          timing: number;
-        };
-
-        // 在客户端应用术语库到原文本
-        const clientCorrectedText = applyTerminologyToText(data.rawText);
 
         setSegments((prev) =>
           prev.map((item) =>
@@ -218,16 +241,16 @@ export function RecognitionClient() {
               ? {
                   ...item,
                   status: "done",
-                  rawText: data.rawText,
-                  correctedText: clientCorrectedText || data.correctedText,
-                  polishedText: data.polishedText,
-                  asrMs: data.asrMs,
-                  glossaryMs: data.glossaryMs,
-                  optimizeMs: data.optimizeMs,
-                  totalMs: data.timing,
-                  optimizeSkipped: data.optimizeSkipped,
-                  optimizeTimedOut: data.optimizeTimedOut,
-                  editedText: data.polishedText
+                  rawText,
+                  correctedText,
+                  polishedText,
+                  asrMs,
+                  glossaryMs,
+                  optimizeMs,
+                  totalMs: asrMs + glossaryMs + optimizeMs,
+                  optimizeSkipped,
+                  optimizeTimedOut,
+                  editedText: polishedText
                 }
               : item
           )
@@ -235,7 +258,7 @@ export function RecognitionClient() {
         setMessage(`第 ${currentIndex + 1} 段识别完成`);
       } catch (error) {
         console.error(error);
-        const errorMessage = getErrorMessage(error);
+        const errorMessage = error instanceof Error ? error.message : "识别失败";
         setSegments((prev) =>
           prev.map((item) =>
             item.key === key
@@ -250,7 +273,7 @@ export function RecognitionClient() {
         setMessage(`识别失败：${errorMessage}`);
       }
     },
-    [createSession, applyTerminologyToText]
+    [createSession]
   );
 
   const releaseRecordingResources = useCallback(() => {

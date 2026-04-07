@@ -163,6 +163,15 @@ export async function listSessionSegments(sessionId: string) {
 export async function readSettings(): Promise<AppSettings> {
   const db = getDb();
   if (!db) {
+    // 在浏览器环境，尝试从 IndexedDB 读取
+    if (typeof window !== "undefined") {
+      const { loadSettingsFromIndexedDb } = await import("@/lib/store/memory");
+      try {
+        return await loadSettingsFromIndexedDb();
+      } catch {
+        // IndexedDB 读取失败，使用内存存储
+      }
+    }
     return getSettings();
   }
 

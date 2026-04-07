@@ -326,6 +326,8 @@ export async function writeNoticeReport(input: {
   createdAt?: string;
   sessionId: string;
   enterpriseName: string;
+  inspector?: string;
+  inspectedAt?: string;
   items: NoticeItem[];
   pdfUrl: string;
 }) {
@@ -343,6 +345,8 @@ export async function writeNoticeReport(input: {
       id,
       sessionId: input.sessionId,
       enterpriseName: input.enterpriseName,
+      inspector: input.inspector,
+      inspectedAt: input.inspectedAt,
       items: input.items,
       pdfUrl: input.pdfUrl,
       createdAt
@@ -352,6 +356,8 @@ export async function writeNoticeReport(input: {
       set: {
         sessionId: input.sessionId,
         enterpriseName: input.enterpriseName,
+        inspector: input.inspector,
+        inspectedAt: input.inspectedAt,
         items: input.items,
         pdfUrl: input.pdfUrl,
         createdAt
@@ -364,6 +370,8 @@ export async function writeNoticeReport(input: {
     noticeId: found.id,
     sessionId: found.sessionId,
     enterpriseName: found.enterpriseName,
+    inspector: found.inspector ?? undefined,
+    inspectedAt: found.inspectedAt ?? undefined,
     items: found.items as NoticeItem[],
     pdfUrl: found.pdfUrl,
     createdAt: dateToIso(found.createdAt)
@@ -384,6 +392,8 @@ export async function readNoticeReport(noticeId: string) {
     noticeId: found.id,
     sessionId: found.sessionId,
     enterpriseName: found.enterpriseName,
+    inspector: found.inspector ?? undefined,
+    inspectedAt: found.inspectedAt ?? undefined,
     items: found.items as NoticeItem[],
     pdfUrl: found.pdfUrl,
     createdAt: dateToIso(found.createdAt)

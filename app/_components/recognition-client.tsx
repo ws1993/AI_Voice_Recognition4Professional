@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 
 import type { NoticeItem } from "@/types/contracts";
+import { getClientStore, applyGlossaryToText, ClientStore } from "@/lib/store/client-repo";
 
 type SegmentStatus = "recognizing" | "done" | "error";
 
@@ -45,7 +46,7 @@ function getErrorMessage(error: unknown) {
 async function getResponseErrorMessage(response: Response) {
   const text = await response.text();
   if (!text) {
-    return `识别失败（${response.status}）`;
+    return `识别失败：${response.status}`;
   }
 
   try {
@@ -70,7 +71,11 @@ export function RecognitionClient() {
   const [inspectedAt, setInspectedAt] = useState("");
   const [notice, setNotice] = useState<NoticeState>(null);
   const [busy, setBusy] = useState(false);
+  const [termsLoaded, setTermsLoaded] = useState(false);
+  const [termsCount, setTermsCount] = useState(0);
   const sessionIdRef = useRef<string>("");
+  const clientStoreRef = useRef<InstanceType<typeof ClientStore> | null>(null);
+  const termsCacheRef = useRef<Awaited<ReturnType<InstanceType<typeof ClientStore>["loadTerms"]>>>([]);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -78,7 +83,58 @@ export function RecognitionClient() {
   const nextSegmentIndexRef = useRef<number>(0);
   const sourceRef = useRef<"realtime" | "upload">("realtime");
 
+  // 加载客户端存储和术语库
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadClientStore() {
+      try {
+        const store = getClientStore();
+        clientStoreRef.current = store;
+
+        // 尝试从 IndexedDB 加载术语库
+        const terms = await store.loadTerms();
+        if (mounted) {
+          termsCacheRef.current = terms;
+          setTermsLoaded(true);
+          setTermsCount(terms.length);
+          if (terms.length > 0) {
+            setMessage(`术语库已加载：${terms.length} 条`);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load client store", error);
+      }
+    }
+
+    void loadClientStore();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /**
+   * 在客户端应用术语库到文本
+   */
+  const applyTerminologyToText = useCallback((text: string): string => {
+    if (termsCacheRef.current.length === 0) {
+      return text;
+    }
+    return applyGlossaryToText(text, termsCacheRef.current);
+  }, []);
+
   const doneCount = useMemo(() => segments.filter((item) => item.status === "done").length, [segments]);
+
+  const termsStatus = useMemo(() => {
+    if (!termsLoaded) {
+      return "术语库：未加载";
+    }
+    if (termsCount === 0) {
+      return "术语库：空（请在管理后台导入）";
+    }
+    return `术语库：${termsCount} 条（IndexedDB）`;
+  }, [termsLoaded, termsCount]);
 
   const createSession = useCallback(async (source: "realtime" | "upload") => {
     if (sessionIdRef.current) {
@@ -153,6 +209,9 @@ export function RecognitionClient() {
           timing: number;
         };
 
+        // 在客户端应用术语库到原文本
+        const clientCorrectedText = applyTerminologyToText(data.rawText);
+
         setSegments((prev) =>
           prev.map((item) =>
             item.key === key
@@ -160,7 +219,7 @@ export function RecognitionClient() {
                   ...item,
                   status: "done",
                   rawText: data.rawText,
-                  correctedText: data.correctedText,
+                  correctedText: clientCorrectedText || data.correctedText,
                   polishedText: data.polishedText,
                   asrMs: data.asrMs,
                   glossaryMs: data.glossaryMs,
@@ -191,7 +250,7 @@ export function RecognitionClient() {
         setMessage(`识别失败：${errorMessage}`);
       }
     },
-    [createSession]
+    [createSession, applyTerminologyToText]
   );
 
   const releaseRecordingResources = useCallback(() => {
@@ -275,7 +334,7 @@ export function RecognitionClient() {
       setMessage("录音中，点击停止后识别");
     } catch (error) {
       console.error(error);
-      setMessage("无法开始录音，请检查麦克风权限");
+      setMessage("鏃犳硶寮€濮嬪綍闊筹紝璇锋鏌ラ害鍏嬮鏉冮檺");
       chunksRef.current = [];
       releaseRecordingResources();
     }
@@ -367,8 +426,7 @@ export function RecognitionClient() {
           {!isRecording ? (
             <button className="btn-primary" onClick={() => void startRecording()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-              开始录音
-            </button>
+              开始录音</button>
           ) : (
             <button className="btn-danger" onClick={stopRecording}>
               <span className="recording-blob" />
@@ -388,14 +446,14 @@ export function RecognitionClient() {
           </label>
         </div>
         <p className="meta">会话 ID：{sessionId || "未创建"} | 状态：{message}</p>
+        <p className="meta">{termsStatus}</p>
       </section>
 
       <section className="panel">
         <h3 style={{ marginTop: 0 }}>识别结果</h3>
-        <p className="meta">
-          已完成 {doneCount} 段 / 共 {segments.length} 段
-        </p>
+        <p className="meta">已完成 {doneCount} 段 / 共 {segments.length} 段</p>
         {segments.length === 0 ? <p className="meta">暂无识别结果</p> : null}
+
         {segments
           .slice()
           .sort((a, b) => a.segmentIndex - b.segmentIndex)
@@ -479,14 +537,13 @@ export function RecognitionClient() {
             </div>
           ))}
           <div className="row">
-            <a className="btn-primary btn" href={notice.pdfUrl} target="_blank" rel="noreferrer">
+            <a className="btn-primary btn" href={`/api/report/${notice.noticeId}/pdf`} target="_blank" rel="noreferrer">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
               下载 PDF
             </a>
             <a className="btn-secondary btn" href={`/report/${notice.noticeId}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
-              查看详情页
-            </a>
+              查看详情页</a>
           </div>
         </section>
       ) : null}
@@ -500,14 +557,13 @@ export function RecognitionClient() {
           </a>
           <a className="btn-secondary btn" href="/admin/terms">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            术语库管理
-          </a>
+            术语库管理</a>
           <a className="btn-secondary btn" href="/admin/clauses">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-            标准条目库管理
-          </a>
+            标准条目库管理</a>
         </div>
       </section>
     </div>
   );
 }
+

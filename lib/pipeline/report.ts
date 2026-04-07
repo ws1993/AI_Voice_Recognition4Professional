@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+﻿import { put } from "@vercel/blob";
 
 import { renderNoticePdfBuffer } from "@/lib/pdf/notice-pdf";
 import { classifyNoticeItems, rankClauses } from "@/lib/pipeline/semantic";
@@ -41,14 +41,13 @@ export async function buildNoticeReport(params: {
     items
   });
 
-  let pdfUrl = `/api/report/${noticeId}/pdf`;
+  const pdfUrl = `/api/report/${noticeId}/pdf`;
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      const uploaded = await put(`notices/${noticeId}.pdf`, pdfBuffer, {
+      await put(`notices/${noticeId}.pdf`, pdfBuffer, {
         access: "public",
         addRandomSuffix: false
       });
-      pdfUrl = uploaded.url;
     } catch (error) {
       console.error("Blob upload failed:", error);
     }
@@ -59,6 +58,8 @@ export async function buildNoticeReport(params: {
     createdAt,
     sessionId,
     enterpriseName,
+    inspector,
+    inspectedAt,
     items,
     pdfUrl
   });
@@ -69,3 +70,4 @@ export async function buildNoticeReport(params: {
     pdfUrl: final.pdfUrl
   };
 }
+

@@ -1,4 +1,4 @@
-import { readNoticeReport } from "@/lib/store/repository";
+﻿import { readNoticeReport } from "@/lib/store/repository";
 
 export const runtime = "nodejs";
 
@@ -21,6 +21,8 @@ export default async function NoticeReportPage({ params }: { params: Promise<{ n
     );
   }
 
+  const pdfHref = `/api/report/${report.noticeId}/pdf`;
+
   return (
     <div className="container">
       <section className="hero">
@@ -29,6 +31,8 @@ export default async function NoticeReportPage({ params }: { params: Promise<{ n
       </section>
       <section className="panel">
         <p className="meta">企业：{report.enterpriseName}</p>
+        {report.inspector ? <p className="meta">检查人：{report.inspector}</p> : null}
+        {report.inspectedAt ? <p className="meta">检查日期：{report.inspectedAt}</p> : null}
         <p className="meta">生成时间：{new Date(report.createdAt).toLocaleString("zh-CN")}</p>
         {report.items.map((item, index) => (
           <div className="segment-item" key={`${item.violatedClauseCode}-${index}`}>
@@ -42,7 +46,7 @@ export default async function NoticeReportPage({ params }: { params: Promise<{ n
           </div>
         ))}
         <div className="row">
-          <a className="btn-primary btn" href={report.pdfUrl} target="_blank" rel="noreferrer">
+          <a className="btn-primary btn" href={pdfHref} target="_blank" rel="noreferrer">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             下载 PDF
           </a>

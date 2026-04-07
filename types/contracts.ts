@@ -37,6 +37,8 @@ export type NoticeReport = {
   noticeId: string;
   sessionId: string;
   enterpriseName: string;
+  inspector?: string;
+  inspectedAt?: string;
   items: NoticeItem[];
   pdfUrl: string;
   createdAt: string;

@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 
 import { useAdminKey } from "@/app/admin/_components/use-admin-key";
+import {
+  getTerms,
+  putTerm,
+  deleteTerm,
+  isIndexedDBAvailable
+} from "@/lib/db/indexeddb";
+import type { GlossaryTermDB } from "@/lib/db/indexeddb";
 
 type Term = {
   id: string;
@@ -15,13 +22,36 @@ type Term = {
 export default function AdminTermsPage() {
   const { adminKey, save } = useAdminKey();
   const [terms, setTerms] = useState<Term[]>([]);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState("IndexedDB 模式：数据存储在浏览器本地");
   const [canonical, setCanonical] = useState("");
   const [aliases, setAliases] = useState("");
   const [priority, setPriority] = useState(100);
   const [enabled, setEnabled] = useState(true);
+  const [storageMode, setStorageMode] = useState<"indexeddb" | "server">("indexeddb");
 
-  async function loadTerms() {
+  // 检查 IndexedDB 可用性
+  useEffect(() => {
+    const available = isIndexedDBAvailable();
+    if (!available) {
+      setMessage("当前浏览器不支持 IndexedDB，已切换到服务器模式");
+      setStorageMode("server");
+    }
+  }, []);
+
+  // 从 IndexedDB 加载术语
+  async function loadTermsFromIndexedDB() {
+    try {
+      const dbTerms = await getTerms();
+      setTerms(dbTerms as Term[]);
+      setMessage(`IndexedDB 术语数：${dbTerms.length}`);
+    } catch (error) {
+      console.error("Failed to load terms from IndexedDB", error);
+      setMessage("IndexedDB 加载失败");
+    }
+  }
+
+  // 从服务器加载术语（备用模式）
+  async function loadTermsFromServer() {
     if (!adminKey) {
       setMessage("请先输入管理密钥");
       return;
@@ -37,21 +67,68 @@ export default function AdminTermsPage() {
       }
       const data = (await response.json()) as { terms: Term[] };
       setTerms(data.terms);
-      setMessage(`已加载 ${data.terms.length} 条术语`);
+      setMessage(`服务器术语数：${data.terms.length}`);
     } catch (error) {
       console.error(error);
       setMessage("加载术语失败");
     }
   }
 
+  async function loadTerms() {
+    if (storageMode === "indexeddb") {
+      await loadTermsFromIndexedDB();
+    } else {
+      await loadTermsFromServer();
+    }
+  }
+
   useEffect(() => {
-    if (adminKey) {
-      void loadTerms();
+    if (storageMode === "indexeddb") {
+      void loadTermsFromIndexedDB();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [storageMode]);
+
+  // 添加术语到 IndexedDB
+  async function addTermToIndexedDB() {
+    if (!canonical.trim()) {
+      setMessage("请输入标准术语");
+      return;
+    }
+
+    try {
+      const newTerm: GlossaryTermDB = {
+        id: `term_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        canonical: canonical.trim(),
+        aliases: aliases
+          .split(/[,，;；]/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        priority,
+        enabled,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await putTerm(newTerm);
+      setCanonical("");
+      setAliases("");
+      setPriority(100);
+      setEnabled(true);
+      await loadTermsFromIndexedDB();
+    } catch (error) {
+      console.error("Failed to add term to IndexedDB", error);
+      setMessage("新增术语失败");
+    }
+  }
 
   async function addTerm() {
+    if (storageMode === "indexeddb") {
+      await addTermToIndexedDB();
+      return;
+    }
+
+    // 服务器模式
     if (!canonical.trim()) {
       setMessage("请输入标准术语");
       return;
@@ -87,7 +164,29 @@ export default function AdminTermsPage() {
     }
   }
 
+  async function toggleTermToIndexedDB(item: Term) {
+    try {
+      const updatedTerm: GlossaryTermDB = {
+        ...item,
+        enabled: !item.enabled,
+        updatedAt: new Date().toISOString()
+      } as GlossaryTermDB;
+
+      await putTerm(updatedTerm);
+      await loadTermsFromIndexedDB();
+    } catch (error) {
+      console.error("Failed to update term in IndexedDB", error);
+      setMessage("更新术语失败");
+    }
+  }
+
   async function toggleTerm(item: Term) {
+    if (storageMode === "indexeddb") {
+      await toggleTermToIndexedDB(item);
+      return;
+    }
+
+    // 服务器模式
     try {
       const response = await fetch(`/api/admin/terms/${item.id}`, {
         method: "PUT",
@@ -112,7 +211,23 @@ export default function AdminTermsPage() {
     }
   }
 
+  async function removeTermFromIndexedDB(id: string) {
+    try {
+      await deleteTerm(id);
+      await loadTermsFromIndexedDB();
+    } catch (error) {
+      console.error("Failed to delete term from IndexedDB", error);
+      setMessage("删除术语失败");
+    }
+  }
+
   async function remove(id: string) {
+    if (storageMode === "indexeddb") {
+      await removeTermFromIndexedDB(id);
+      return;
+    }
+
+    // 服务器模式
     try {
       const response = await fetch(`/api/admin/terms/${id}`, {
         method: "DELETE",
@@ -130,11 +245,32 @@ export default function AdminTermsPage() {
     }
   }
 
+  // 切换存储模式
+  function toggleStorageMode() {
+    const newMode = storageMode === "indexeddb" ? "server" : "indexeddb";
+    setStorageMode(newMode);
+    setMessage(`已切换到${newMode === "indexeddb" ? "IndexedDB" : "服务器"}模式`);
+  }
+
   return (
     <section className="panel">
       <h3 style={{ marginTop: 0 }}>术语库管理</h3>
-      <label>管理密钥（X-Admin-Key）</label>
-      <input value={adminKey} onChange={(e) => save(e.target.value)} />
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <span className="meta">
+          存储模式：{storageMode === "indexeddb" ? "IndexedDB（浏览器本地）" : "服务器数据库"}
+        </span>
+        <button className="btn-secondary" onClick={toggleStorageMode}>
+          切换到{storageMode === "indexeddb" ? "服务器" : "IndexedDB"}模式
+        </button>
+      </div>
+
+      {storageMode === "server" && (
+        <label>管理密钥（X-Admin-Key）</label>
+      )}
+      {storageMode === "server" && (
+        <input value={adminKey} onChange={(e) => save(e.target.value)} />
+      )}
 
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn-secondary" onClick={() => void loadTerms()}>

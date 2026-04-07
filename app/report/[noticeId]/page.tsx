@@ -1,0 +1,54 @@
+import { readNoticeReport } from "@/lib/store/repository";
+
+export const runtime = "nodejs";
+
+export default async function NoticeReportPage({ params }: { params: Promise<{ noticeId: string }> }) {
+  const { noticeId } = await params;
+  const report = await readNoticeReport(noticeId);
+
+  if (!report) {
+    return (
+      <div className="container">
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>通知单不存在</h3>
+          <p className="meta">编号：{noticeId}</p>
+          <a className="btn-secondary" href="/">
+            返回首页
+          </a>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container">
+      <section className="hero">
+        <h1>通知单详情</h1>
+        <p>{report.noticeId}</p>
+      </section>
+      <section className="panel">
+        <p className="meta">企业：{report.enterpriseName}</p>
+        <p className="meta">生成时间：{new Date(report.createdAt).toLocaleString("zh-CN")}</p>
+        {report.items.map((item, index) => (
+          <div className="segment-item" key={`${item.violatedClauseCode}-${index}`}>
+            <strong>
+              {index + 1}. {item.problemDescription}
+            </strong>
+            <p className="meta">违反条款：{item.violatedClauseCode}</p>
+            <p className="meta">条款内容：{item.violatedClauseText}</p>
+            <p className="meta">整改建议：{item.rectificationSuggestion}</p>
+            <p className="meta">依据标准：{item.standardBasis}</p>
+          </div>
+        ))}
+        <div className="row">
+          <a className="btn-primary" href={report.pdfUrl} target="_blank" rel="noreferrer">
+            下载 PDF
+          </a>
+          <a className="btn-secondary" href="/">
+            返回首页
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}

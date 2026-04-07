@@ -14,18 +14,16 @@ import {
 import {
   createReport,
   createSession,
-  deleteTerm,
   getReport,
   getSession,
   getSettings,
   listClauses,
   listSegments,
-  listTerms,
   replaceClauses,
   saveSegment,
-  saveSettings,
-  upsertTerm
+  saveSettings
 } from "@/lib/store/memory";
+import { readLocalTerms, removeLocalTerm, writeLocalTerm } from "@/lib/store/local-terms";
 import { makeId, nowIso } from "@/lib/utils/ids";
 import type { AppSettings, GlossaryTerm, NoticeItem, SafetyClause, SegmentResult } from "@/types/contracts";
 
@@ -205,7 +203,7 @@ export async function writeSettings(input: AppSettings): Promise<AppSettings> {
 export async function readTerms(): Promise<GlossaryTerm[]> {
   const db = getDb();
   if (!db) {
-    return listTerms();
+    return readLocalTerms();
   }
   const rows = await db.select().from(glossaryTermsTable).orderBy(asc(glossaryTermsTable.priority));
   return rows.map((row) => ({
@@ -228,7 +226,7 @@ export async function writeTerm(input: {
 }): Promise<GlossaryTerm> {
   const db = getDb();
   if (!db) {
-    return upsertTerm(input);
+    return writeLocalTerm(input);
   }
 
   const id = input.id ?? makeId("term");
@@ -271,7 +269,7 @@ export async function writeTerm(input: {
 export async function removeTerm(id: string): Promise<boolean> {
   const db = getDb();
   if (!db) {
-    return deleteTerm(id);
+    return removeLocalTerm(id);
   }
   const result = await db.delete(glossaryTermsTable).where(eq(glossaryTermsTable.id, id)).returning();
   return result.length > 0;

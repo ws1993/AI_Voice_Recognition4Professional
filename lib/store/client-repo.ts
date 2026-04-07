@@ -12,6 +12,7 @@
 import {
   getClauses,
   getTerms,
+  getSettings as getIdbSettings,
   putBatch,
   clear,
   STORES,
@@ -29,30 +30,30 @@ function getDefaultAppSettings(): AppSettings {
       {
         id: "provider-asr-default",
         kind: "asr",
-        name: "ASR Provider",
-        baseUrl: "",
-        model: "whisper-large-v3",
-        apiKeyEnvName: "ASR_API_KEY",
-        apiStyle: "audio_transcription",
+        name: "default-asr",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "qwen3-asr-flash",
+        apiKey: "",
+        apiStyle: "chat_audio",
         enabled: true
       },
       {
         id: "provider-llm-default",
         kind: "llm",
-        name: "LLM Provider",
-        baseUrl: "",
-        model: "qwen-plus",
-        apiKeyEnvName: "LLM_API_KEY",
+        name: "default-llm",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "qwen3.5-flash",
+        apiKey: "",
         apiStyle: "chat_completions",
         enabled: true
       },
       {
         id: "provider-embedding-default",
         kind: "embedding",
-        name: "Embedding Provider",
-        baseUrl: "",
-        model: "text-embedding-v3",
-        apiKeyEnvName: "EMBEDDING_API_KEY",
+        name: "default-embedding",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "text-embedding-v4",
+        apiKey: "",
         apiStyle: "embeddings",
         enabled: true
       }
@@ -164,7 +165,30 @@ export class ClientStore {
   }
 
   /**
-   * 获取应用设置（默认值）
+   * 获取应用设置（从 IndexedDB 读取或返回默认值）
+   */
+  async loadSettings(): Promise<AppSettings> {
+    try {
+      const idbSettings = await getIdbSettings();
+      if (idbSettings?.payload) {
+        const payload = idbSettings.payload as AppSettings;
+        // 检查数据完整性
+        if (payload.providers && payload.prompts && payload.recognition) {
+          this.settingsCache = normalizeAppSettings(payload);
+          return this.settingsCache;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load settings from IndexedDB", error);
+    }
+
+    // 返回默认值
+    this.settingsCache = getDefaultAppSettings();
+    return this.settingsCache;
+  }
+
+  /**
+   * 获取应用设置（缓存版本，可能不是最新）
    */
   getSettings(): AppSettings {
     if (!this.settingsCache) {

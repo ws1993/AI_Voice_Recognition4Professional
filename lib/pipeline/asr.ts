@@ -24,10 +24,9 @@ export async function transcribeAudio(file: File, language: string, settings: Ap
     throw new AsrConfigError("未启用可用的 ASR 提供商，请检查后台模型配置。");
   }
 
-  const apiKey = process.env[provider.apiKeyEnvName]?.trim();
-  if (!apiKey) {
+  if (!provider.apiKey || provider.apiKey.trim().length === 0) {
     throw new AsrConfigError(
-      `未配置 ASR 环境变量 ${provider.apiKeyEnvName}；若刚修改 .env.local，请重启服务后再试。`
+      `未配置 ASR API Key；请在管理设置页面配置 provider.apiKey。`
     );
   }
 

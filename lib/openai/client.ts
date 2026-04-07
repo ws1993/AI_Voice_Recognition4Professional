@@ -26,7 +26,7 @@ type ChatCompletionResponse = {
 const EMBEDDING_DIMENSIONS = 1536;
 
 function getApiKey(profile: ProviderProfile): string | undefined {
-  return process.env[profile.apiKeyEnvName];
+  return profile.apiKey;
 }
 
 function withPath(baseUrl: string, endpoint: string): string {

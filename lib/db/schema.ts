@@ -28,7 +28,7 @@ export const providerProfiles = pgTable("provider_profiles", {
   name: text("name").notNull(),
   baseUrl: text("base_url").notNull(),
   model: text("model").notNull(),
-  apiKeyEnvName: text("api_key_env_name").notNull(),
+  apiKey: text("api_key").notNull(),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
@@ -53,7 +53,7 @@ export const appSettings = pgTable("app_settings", {
         name: string;
         baseUrl: string;
         model: string;
-        apiKeyEnvName: string;
+        apiKey: string;
         apiStyle: string;
         enabled: boolean;
       }>;

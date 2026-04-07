@@ -10,7 +10,6 @@ import { openAiLikeTranscribe } from "@/lib/openai/client";
 import { AsrConfigError, AsrProviderError, transcribeAudio } from "@/lib/pipeline/asr";
 
 const mockedOpenAiLikeTranscribe = vi.mocked(openAiLikeTranscribe);
-const originalEnv = { ...process.env };
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function makeSettings(kind: "asr" | "llm" = "asr"): AppSettings {
@@ -22,7 +21,7 @@ function makeSettings(kind: "asr" | "llm" = "asr"): AppSettings {
         name: `default-${kind}`,
         baseUrl: "https://example.com/v1",
         model: `${kind}-model`,
-        apiKeyEnvName: "TEST_ASR_KEY",
+        apiKey: "test-api-key",
         apiStyle: kind === "asr" ? "audio_transcription" : "chat_completions",
         enabled: true
       }
@@ -48,8 +47,6 @@ function makeFile() {
 describe("transcribeAudio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
-    delete process.env.TEST_ASR_KEY;
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -61,26 +58,25 @@ describe("transcribeAudio", () => {
     await expect(transcribeAudio(makeFile(), "zh-CN", makeSettings("llm"))).rejects.toBeInstanceOf(AsrConfigError);
   });
 
-  it("throws config error with env name when api key is missing", async () => {
-    await expect(transcribeAudio(makeFile(), "zh-CN", makeSettings())).rejects.toThrow("TEST_ASR_KEY");
+  it("throws config error when api key is missing", async () => {
+    const settingsWithoutKey = makeSettings();
+    settingsWithoutKey.providers[0].apiKey = "";
+    await expect(transcribeAudio(makeFile(), "zh-CN", settingsWithoutKey)).rejects.toThrow("未配置 ASR API Key");
   });
 
   it("returns transcript text from provider", async () => {
-    process.env.TEST_ASR_KEY = "secret";
     mockedOpenAiLikeTranscribe.mockResolvedValueOnce("  识别成功  ");
 
     await expect(transcribeAudio(makeFile(), "zh-CN", makeSettings())).resolves.toBe("识别成功");
   });
 
   it("throws provider error when provider returns empty content", async () => {
-    process.env.TEST_ASR_KEY = "secret";
     mockedOpenAiLikeTranscribe.mockResolvedValueOnce("   ");
 
     await expect(transcribeAudio(makeFile(), "zh-CN", makeSettings())).rejects.toBeInstanceOf(AsrProviderError);
   });
 
   it("throws provider error when upstream request fails", async () => {
-    process.env.TEST_ASR_KEY = "secret";
     mockedOpenAiLikeTranscribe.mockRejectedValueOnce(new Error("401 unauthorized"));
 
     await expect(transcribeAudio(makeFile(), "zh-CN", makeSettings())).rejects.toThrow("401 unauthorized");

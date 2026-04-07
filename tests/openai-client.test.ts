@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openAiLikeChat, openAiLikeTranscribe } from "@/lib/openai/client";
 import type { ProviderProfile } from "@/types/contracts";
 
-const originalEnv = { ...process.env };
-
 function makeProfile(): ProviderProfile {
   return {
     id: "provider-asr-default",
@@ -12,7 +10,7 @@ function makeProfile(): ProviderProfile {
     name: "default-asr",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     model: "qwen3-asr-flash",
-    apiKeyEnvName: "TEST_DASHSCOPE_KEY",
+    apiKey: "test-api-key",
     apiStyle: "chat_audio",
     enabled: true
   };
@@ -20,12 +18,11 @@ function makeProfile(): ProviderProfile {
 
 describe("openAiLikeTranscribe chat_audio payload", () => {
   beforeEach(() => {
-    process.env = { ...originalEnv, TEST_DASHSCOPE_KEY: "secret" };
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
   });
 
   it("sends DashScope-compatible input_audio payload", async () => {

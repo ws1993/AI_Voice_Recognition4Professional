@@ -14,7 +14,7 @@
       "name": "default-asr",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "qwen3-asr-flash",
-      "apiKeyEnvName": "DASHSCOPE_API_KEY",
+      "apiKey": "",
       "apiStyle": "chat_audio",
       "enabled": true
     },
@@ -22,7 +22,7 @@
       "name": "default-llm",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "qwen3.5-flash",
-      "apiKeyEnvName": "DASHSCOPE_API_KEY",
+      "apiKey": "",
       "apiStyle": "chat_completions",
       "enabled": true
     },
@@ -30,7 +30,7 @@
       "name": "default-embedding",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "text-embedding-v4",
-      "apiKeyEnvName": "DASHSCOPE_API_KEY",
+      "apiKey": "",
       "apiStyle": "embeddings",
       "enabled": true
     }

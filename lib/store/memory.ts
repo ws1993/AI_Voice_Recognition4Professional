@@ -1,5 +1,9 @@
 import { normalizeAppSettings } from "@/lib/config/providers";
 import { getDefaultAppSettings } from "@/lib/config/runtime";
+import {
+  getSettings as getIdbSettings,
+  putSettings as putIdbSettings
+} from "@/lib/db/indexeddb";
 import { makeId, nowIso } from "@/lib/utils/ids";
 import type {
   AppSettings,
@@ -51,6 +55,30 @@ function store(): DataStore {
 
 export function getSettings(): AppSettings {
   return normalizeAppSettings(store().settings);
+}
+
+export async function loadSettingsFromIndexedDb(): Promise<AppSettings> {
+  const idbSettings = await getIdbSettings();
+  if (idbSettings?.payload) {
+    const payload = idbSettings.payload as AppSettings;
+    // 检查数据完整性，缺少字段则使用默认值
+    if (!payload.prompts || !payload.recognition || !payload.providers) {
+      return getDefaultAppSettings();
+    }
+    return normalizeAppSettings(payload);
+  }
+  return getDefaultAppSettings();
+}
+
+export async function saveSettingsToIndexedDb(next: AppSettings): Promise<AppSettings> {
+  const normalized = normalizeAppSettings(next);
+  store().settings = normalized;
+  await putIdbSettings({
+    id: "default",
+    payload: normalized,
+    updatedAt: nowIso()
+  });
+  return normalized;
 }
 
 export function saveSettings(next: AppSettings): AppSettings {

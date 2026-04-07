@@ -8,7 +8,7 @@ export type ProviderProfile = {
   name: string;
   baseUrl: string;
   model: string;
-  apiKeyEnvName: string;
+  apiKey: string;
   apiStyle: ProviderApiStyle;
   enabled: boolean;
 };

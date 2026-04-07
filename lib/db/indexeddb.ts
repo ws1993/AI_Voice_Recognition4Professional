@@ -43,6 +43,34 @@ export type GlossaryTermDB = {
   updatedAt: string;
 };
 
+export type AppSettingsDB = {
+  id: string;
+  payload: {
+    providers: Array<{
+      id: string;
+      kind: string;
+      name: string;
+      baseUrl: string;
+      model: string;
+      apiKey: string;
+      apiStyle: string;
+      enabled: boolean;
+    }>;
+    prompts: {
+      textOptimize: string;
+      noticeGenerate: string;
+    };
+    recognition: {
+      language: string;
+      silenceMs: number;
+      maxSegmentSeconds: number;
+      asrRetries: number;
+      llmRetries: number;
+    };
+  };
+  updatedAt: string;
+};
+
 // 数据库实例缓存
 let dbInstance: IDBDatabase | null = null;
 
@@ -232,6 +260,17 @@ export async function putTerm(term: GlossaryTermDB): Promise<void> {
 
 export async function deleteTerm(id: string): Promise<void> {
   return remove(STORES.TERMS, id);
+}
+
+/**
+ * 应用设置专用操作
+ */
+export async function getSettings(): Promise<AppSettingsDB | null> {
+  return get<AppSettingsDB>(STORES.SETTINGS, "default");
+}
+
+export async function putSettings(settings: AppSettingsDB): Promise<void> {
+  return put<AppSettingsDB>(STORES.SETTINGS, settings);
 }
 
 /**

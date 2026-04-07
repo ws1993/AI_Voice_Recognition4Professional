@@ -19,7 +19,7 @@ function makeSettings(): AppSettings {
         name: "default-llm",
         baseUrl: "https://example.com/v1",
         model: "qwen3.5-flash",
-        apiKeyEnvName: "TEST_KEY",
+        apiKey: "test-api-key",
         apiStyle: "chat_completions",
         enabled: true
       }

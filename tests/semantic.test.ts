@@ -10,7 +10,7 @@ const settings = {
       name: "llm",
       baseUrl: "https://api.example.com/v1",
       model: "mock",
-      apiKeyEnvName: "NO_KEY",
+      apiKey: "",
       apiStyle: "chat_completions" as const,
       enabled: false
     },
@@ -20,7 +20,7 @@ const settings = {
       name: "emb",
       baseUrl: "https://api.example.com/v1",
       model: "mock",
-      apiKeyEnvName: "NO_KEY",
+      apiKey: "",
       apiStyle: "embeddings" as const,
       enabled: false
     }

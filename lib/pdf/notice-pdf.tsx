@@ -16,10 +16,26 @@ type NoticePdfInput = {
 
 const PDF_FONT_FAMILY = "NoticePdfSans";
 let resolvedFontFamily: string | null | undefined;
+let resolvedFontSource: string | null | undefined;
+
+const REMOTE_CJK_FONT_URLS = [
+  process.env.NOTICE_PDF_FONT_URL?.trim(),
+  "https://cdn.jsdelivr.net/gh/adobe-fonts/source-han-sans@release/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf",
+  "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+].filter((value): value is string => Boolean(value));
+
+function normalizeFontPath(candidate: string) {
+  return path.isAbsolute(candidate) ? candidate : path.join(process.cwd(), candidate);
+}
+
+function isHttpUrl(candidate: string) {
+  return candidate.startsWith("http://") || candidate.startsWith("https://");
+}
 
 function resolveFontCandidates() {
   return [
     process.env.NOTICE_PDF_FONT_PATH?.trim(),
+    ...REMOTE_CJK_FONT_URLS,
     path.join(process.cwd(), "public", "fonts", "NotoSansSC-Regular.ttf"),
     path.join(process.cwd(), "public", "fonts", "NotoSansSC-Regular.otf"),
     path.join(process.cwd(), "public", "fonts", "SourceHanSansSC-Regular.otf"),
@@ -32,7 +48,9 @@ function resolveFontCandidates() {
     "/System/Library/Fonts/Hiragino Sans GB.ttc",
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/Supplemental/Songti.ttc"
-  ].filter((value): value is string => Boolean(value));
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => (isHttpUrl(value) ? value : normalizeFontPath(value)));
 }
 
 function ensurePdfFontFamily() {
@@ -43,12 +61,13 @@ function ensurePdfFontFamily() {
   let lastError: unknown = null;
   for (const candidate of resolveFontCandidates()) {
     try {
-      if (!fs.existsSync(candidate)) {
+      if (!isHttpUrl(candidate) && !fs.existsSync(candidate)) {
         continue;
       }
 
       Font.register({ family: PDF_FONT_FAMILY, src: candidate });
       resolvedFontFamily = PDF_FONT_FAMILY;
+      resolvedFontSource = candidate;
       return resolvedFontFamily;
     } catch (error) {
       lastError = error;
@@ -56,6 +75,7 @@ function ensurePdfFontFamily() {
   }
 
   resolvedFontFamily = null;
+  resolvedFontSource = null;
   const hint = "Configure NOTICE_PDF_FONT_PATH or add a CJK font under public/fonts.";
   if (lastError) {
     console.warn(`Failed to register a CJK PDF font. ${hint}`, lastError);
@@ -63,6 +83,14 @@ function ensurePdfFontFamily() {
     console.warn(`No CJK PDF font found. ${hint}`);
   }
   return resolvedFontFamily;
+}
+
+export function getNoticePdfFontDebugInfo() {
+  ensurePdfFontFamily();
+  return {
+    fontFamily: resolvedFontFamily,
+    fontSource: resolvedFontSource
+  };
 }
 
 function createStyles(fontFamily?: string | null) {

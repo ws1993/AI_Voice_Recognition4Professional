@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 
-import { renderNoticePdfBuffer } from "@/lib/pdf/notice-pdf";
+import { getNoticePdfFontDebugInfo, renderNoticePdfBuffer } from "@/lib/pdf/notice-pdf";
 import { readNoticeReport } from "@/lib/store/repository";
 import { fail } from "@/lib/utils/http";
 
@@ -22,11 +22,15 @@ export async function GET(_: Request, context: { params: Promise<{ noticeId: str
     items: report.items
   });
 
+  const fontDebug = getNoticePdfFontDebugInfo();
+
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${report.noticeId}.pdf"`,
-      "Cache-Control": "no-store"
+      "Cache-Control": "no-store",
+      "X-Notice-Pdf-Font-Ready": fontDebug.fontFamily ? "1" : "0",
+      "X-Notice-Pdf-Font-Source": fontDebug.fontSource ? encodeURIComponent(fontDebug.fontSource) : "none"
     }
   });
 }

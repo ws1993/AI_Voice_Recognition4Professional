@@ -40,11 +40,15 @@ export const providerProfileSchema = z
     name: z.string().min(1),
     baseUrl: z.string().url(),
     model: z.string().min(1),
-    apiKeyEnvName: z.string().min(1),
+    apiKey: z.string(),
     apiStyle: providerApiStyleSchema.optional(),
-    enabled: z.boolean()
+    enabled: z.boolean().optional()
   })
-  .transform((value) => normalizeProviderProfile(value));
+  .transform((value) => ({
+    ...value,
+    enabled: value.enabled ?? true,
+    apiStyle: value.apiStyle
+  }));
 
 export const promptTemplatesSchema = z.object({
   textOptimize: z.string().min(1),
